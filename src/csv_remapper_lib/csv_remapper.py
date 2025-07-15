@@ -1,9 +1,10 @@
 class CSVFile:
     def __init__(self, path: str = ""):
-        self.path = path
+        self.path : str = path
         self.file = None
-        self.content = None
-
+        self.content : str = ""
+        self.open_file()
+        
     def open_file(self):
         if not self.path:
             raise ValueError("Path to the CSV file is not provided.")
@@ -20,15 +21,16 @@ class CSVFile:
     def replace_key(self, old_key: str, new_key: str):
         if not self.content:
             self.open_file()
-        else:
-            self_content = self.content.replace(old_key, new_key)
+        
+        self.content = self.content.replace(old_key, new_key)
+        
     
-    
-    def save(self):
+    def save(self, new_path: str = ""):
+        save_path = new_path or self.path
         if not self.content:
             raise ValueError("File is not open.")
         # In this context, save does not perform any action as changes are saved immediately
         # after writing to the file in replace_key method.
-        with open(self.path, 'w', encoding='utf-8') as file:
+        with open(save_path, 'w', encoding='utf-8') as file:
             file.write(self.content)
         
