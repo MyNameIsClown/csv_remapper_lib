@@ -32,3 +32,19 @@ def test_replace_key():
     assert modified_content is not None and new_key in modified_content
     assert original_content != modified_content
     csv.close_file()
+
+def test_replace_key_error():
+    old_key = "Total Pricing"
+    new_key = "Total"
+    original_file_path = "tests/test_data/sample_2.csv"
+
+    # Creating CSVFile, replacing key and save it
+    csv = CSVFile(path=original_file_path)
+    
+    with open(original_file_path, "r") as f:
+        original_content = f.read()
+
+    with pytest.raises(Exception) as exc_info:
+        csv.replace_key(old_key, new_key)
+    
+    assert "Old key not found" in str(exc_info.value)
