@@ -40,7 +40,7 @@ class CSVFile:
             self.file.close()
             self.file = None
     
-    def replace_key(self, old_key: str, new_key: str):
+    def rename_key(self, old_key: str, new_key: str):
         if not self.content:
             self.open_file()
 
@@ -68,6 +68,24 @@ class CSVFile:
                 row.pop(key_index)
         else:
             raise Exception("Key not found")
+    
+    def remove_keys(self, keys: list[str]):
+        if not self.content:
+            self.open_file()
+        
+        key_indexes = []
+        for key in keys:
+            key_indexes.append(self._found_key(key))
+        
+        if None not in key_indexes:
+            # IMPORTANT: Order indexes desc to delete last items first
+            key_indexes.sort(reverse=True)
+
+            for row in self.content:
+                for key in key_indexes:
+                    row.pop(key)
+        else:
+            raise Exception("One or more keys not found")
         
 
     
