@@ -48,3 +48,39 @@ def test_replace_key_error():
         csv.replace_key(old_key, new_key)
     
     assert "Old key not found" in str(exc_info.value)
+
+def test_remove_key():
+    key = "Quantity"
+    original_file_path = "tests/test_data/sample_2.csv"
+    new_file_path = "tests/test_data/sample_new.csv"
+
+    # Creating CSVFile, replacing key and save it
+    csv = CSVFile(path=original_file_path)
+    
+    with open(original_file_path, "r") as f:
+        original_content = f.read()
+
+    csv.remove_key(key)
+    csv.save(new_file_path)
+
+    # Open new file and compare contents
+    with open(new_file_path, "r") as f:
+        modified_content = f.read()
+    
+    assert original_content is not None and key in original_content
+    assert modified_content is not None and key not in modified_content
+    assert original_content != modified_content
+    csv.close_file()
+
+
+def test_remove_key_error():
+    key = "Biscuit"
+    original_file_path = "tests/test_data/sample_2.csv"
+
+    # Creating CSVFile, replacing key and save it
+    csv = CSVFile(path=original_file_path)
+
+    with pytest.raises(Exception) as exc_info:
+        csv.remove_key(key)
+    
+    assert "Key not found" in str(exc_info.value)

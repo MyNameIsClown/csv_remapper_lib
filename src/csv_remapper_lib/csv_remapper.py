@@ -3,7 +3,7 @@ class CSVFile:
         # Declare class variables
         self.path : str = path
         self.file = None
-        self.content : list = []
+        self.content : list[list] = []
         self.delimiter : str = "," # Base delimiter
         self.open_file()
         
@@ -47,16 +47,28 @@ class CSVFile:
         key_index = None
 
         # Found Index for matching key
-        for idx, key in enumerate(self.content[0]):
-            if key == old_key:
-                key_index = idx
-                break
+        key_index = self._found_key(old_key)
 
         if key_index != None:
             self.content[0][key_index] = new_key
         else:
             raise Exception("Old key not found")
 
+    def remove_key(self, key: str):
+        if not self.content:
+            self.open_file()
+        
+        key_index = None
+
+        # Found Index for matching key
+        key_index = self._found_key(key)
+
+        if key_index != None:
+            for row in self.content:
+                row.pop(key_index)
+        else:
+            raise Exception("Key not found")
+        
 
     
     def save(self, new_path: str = ""):
@@ -77,4 +89,10 @@ class CSVFile:
                 str_content += "\n"
 
             file.write(str_content)
-        
+    
+    def _found_key(self, key: str = ""):
+        """Found key on keys row"""
+        for idx, csv_key in enumerate(self.content[0]):
+            if key == csv_key:
+                return idx
+        return None    
