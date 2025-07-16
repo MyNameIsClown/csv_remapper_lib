@@ -1,3 +1,5 @@
+from copy import deepcopy
+
 class CSVFile:
     def __init__(self, path: str = ""):
         # Declare class variables
@@ -53,6 +55,21 @@ class CSVFile:
             self.content[0][key_index] = new_key
         else:
             raise Exception("Old key not found")
+    
+    def rename_keys(self, key_dict: dict[str, str]):
+        if not self.content:
+            self.open_file()
+
+        tmp_content = deepcopy(self.content)
+        for old_key in key_dict.keys():
+            # Found Index for matching key
+            key_index = self._found_key(old_key)
+            if key_index == None:
+                raise Exception("One or more key in dict not found")
+                
+            tmp_content[0][key_index] = key_dict.get(old_key)
+        
+        self.content = tmp_content
 
     def remove_key(self, key: str):
         if not self.content:
