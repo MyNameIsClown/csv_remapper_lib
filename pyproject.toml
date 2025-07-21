@@ -5,7 +5,7 @@ description = "A library for remapping CSV files based on a mapping file."
 authors = [
     {name = "Víctor Carrasco"}
 ]
-license = {text = "MIT"}
+license = {text = "AGPL v3"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
