@@ -127,8 +127,39 @@ class CSVFile:
         for idx, row in enumerate(self.content):
             if idx > 0:
                 try:
-                    value = float(row[key_index].replace('"', '').replace("'", ''))
+                    value = float(row[key_index])
                     if value < 0:
+                        value = value * -1
+                    row[key_index] = str(value)
+
+                except Exception as e:
+                    error_row_indexes.append(idx)
+        # Case no errors
+        if len(error_row_indexes) == 0:
+            return 0
+        # Case all values error
+        elif len(error_row_indexes) == len(self.content) - 1:
+            return -1
+        # Case some errores
+        else:
+            return error_row_indexes
+    
+    def to_negative_number(self, key: str) -> int | list[int]:
+        """
+        This method transforms all values of given key to negative number.
+        If it were posible to transform any value then returns 0, if not then return -1 and 
+        if there was errors at some values then return a list of row index, the 0 index indicates the row of the keys
+        """
+        key_index = self._found_key(key)
+        if key_index is None:
+            raise Exception("Key not found")
+        error_row_indexes = []
+        
+        for idx, row in enumerate(self.content):
+            if idx > 0:
+                try:
+                    value = float(row[key_index])
+                    if value > 0:
                         value = value * -1
                     row[key_index] = str(value)
 
