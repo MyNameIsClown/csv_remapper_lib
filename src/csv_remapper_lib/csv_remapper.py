@@ -1,3 +1,4 @@
+import re
 from copy import deepcopy
 
 class CSVFile:
@@ -15,8 +16,16 @@ class CSVFile:
         with open(self.path, 'r', encoding='utf-8') as file:
             self.file = file
             str_content = file.read()
-            # Decompressing String info to list of lists
+            # First replace float with comma, typically used on spanish alphabet, to english float numbers
             counter = 0
+            spanish_float_numbers : list[str] = re.findall('"[0-9]+,[0-9]+"', str_content)
+            for spanish_number in spanish_float_numbers:
+                # Delete " simbol, then divide the numbers by comma. Replace the original number by new one using dot instead comma
+                new_number_divided = spanish_number.replace('"', "").split(",")
+                new_number = '%s.%s' % (new_number_divided[0], new_number_divided[1])
+                str_content = str_content.replace(spanish_number, new_number)
+
+            # Decompressing String info to list of lists
             for line in str_content.split("\n"):
                 # To look for the delimiter of the csv file we are comparing the number of times
                 # that one of each posibilities apears at keys row. It has to be 1 time less than the number of keys.
@@ -104,8 +113,39 @@ class CSVFile:
         else:
             raise Exception("One or more keys not found")
         
+    def to_positive_number(self, key: str) -> int | list[int]:
+        """
+        This method transforms all values of given key to positive number.
+        If it were posible to transform any value then returns 0, if not then return -1 and 
+        if there was errors at some values then return a list of row index, the 0 index indicates the row of the keys
+        """
+        key_index = self._found_key(key)
+        if key_index is None:
+            raise Exception("Key not found")
+        error_row_indexes = []
+        
+        for idx, row in enumerate(self.content):
+            if idx > 0:
+                try:
+                    value = float(row[key_index].replace('"', '').replace("'", ''))
+                    if value < 0:
+                        value = value * -1
+                    row[key_index] = str(value)
 
-    
+                except Exception as e:
+                    error_row_indexes.append(idx)
+        # Case no errors
+        if len(error_row_indexes) == 0:
+            return 0
+        # Case all values error
+        elif len(error_row_indexes) == len(self.content) - 1:
+            return -1
+        # Case some errores
+        else:
+            return error_row_indexes
+
+
+
     def save(self, new_path: str = ""):
         save_path = new_path or self.path
         if not self.content:

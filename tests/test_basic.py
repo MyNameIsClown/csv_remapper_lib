@@ -175,3 +175,15 @@ def test_rename_keys_error():
         csv.rename_keys(keys)
     
     assert "One or more key in dict not found" in str(exc_info.value)
+
+def test_to_positive_value():
+    key = "Precio unitario"
+
+    original_file_path = "tests/test_data/articulos.csv"
+    modified_file_path = "tests/test_data/sample_positive_number.csv"
+
+    csv = CSVFile(original_file_path)
+    result = csv.to_positive_number(key)
+    csv.save(modified_file_path)
+
+    assert result == 0
