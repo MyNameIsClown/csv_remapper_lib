@@ -1,4 +1,5 @@
 import re
+from dateutil import parser
 from copy import deepcopy
 
 class CSVFile:
@@ -175,7 +176,34 @@ class CSVFile:
         else:
             return error_row_indexes
 
-
+    def to_date(self, key: str) -> int | list[int]:
+        """
+        This method transforms all values of given key to date.
+        If it were posible to transform any value then returns 0, if not then return -1 and 
+        if there was errors at some values then return a list of row index, the 0 index indicates the row of the keys
+        """
+        key_index = self._found_key(key)
+        if key_index is None:
+            raise Exception("Key not found")
+        error_row_indexes = []
+        
+        for idx, row in enumerate(self.content):
+            if idx > 0:
+                try:
+                    value_to_change = row[key_index]
+                    new_value = str(parser.parse(value_to_change).date())
+                    row[key_index] = new_value
+                except parser.ParserError as e:
+                    error_row_indexes.append(idx)
+        # Case no errors
+        if len(error_row_indexes) == 0:
+            return 0
+        # Case all values error
+        elif len(error_row_indexes) == len(self.content) - 1:
+            return -1
+        # Case some errores
+        else:
+            return error_row_indexes
 
     def save(self, new_path: str = ""):
         save_path = new_path or self.path
