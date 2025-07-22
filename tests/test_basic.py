@@ -1,6 +1,4 @@
 from csv_remapper_lib import CSVFile
-import pytest
-import os
 
 def test_load_csv():
     # Test loading a CSV file

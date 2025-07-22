@@ -1,6 +1,19 @@
 import re
+from enum import Enum, auto
 from dateutil import parser
 from copy import deepcopy
+
+class MergeType(Enum):
+    NUMBER = auto()
+    TEXT = auto()
+    TIME = auto()
+    PERCENTAGE = auto()
+
+class ConnectorType:
+    def __init__(self, type: MergeType, action = sum, delimiter: str = " ") -> None:
+        self.type = type
+        self.action = action
+        self.delimiter = delimiter
 
 class CSVFile:
     def __init__(self, path: str = ""):
@@ -51,6 +64,63 @@ class CSVFile:
         if self.file:
             self.file.close()
             self.file = None
+    
+    def merge_keys(self, ordered_key_list: list[str], connector: ConnectorType, new_key_name: str, delete_old_keys: bool = True) -> None:
+        """
+        Merges multiple columns (keys) in the CSV content into a new column using a specified connector.
+        Args:
+            ordered_key_list (list[str]): List of column names to merge, in the order they should be combined.
+            connector (ConnectorType): The value or function used to join the column values (e.g., a string separator).
+            new_key_name (str): The name of the new column that will contain the merged values.
+            delete_old_keys (bool, optional): If True, the original columns will be removed after merging. Defaults to True.
+        Raises:
+            FileNotFoundError: If the CSV content is not loaded and cannot be opened.
+            KeyError: If any of the specified keys are not found in the CSV header.
+        Notes:
+            - The method modifies the CSV content in place.
+            - The new column is appended to the end of the header and each row.
+            - If delete_old_keys is True, the original columns are removed after merging.
+        """
+        if not self.content:
+            self.open_file()
+        
+        tmp_content = deepcopy(self.content)
+        key_indexes = []
+
+        # Add new key at the end of list
+        tmp_content[0].append(new_key_name)
+
+        # Look for index of given keys and add it to key_indexes list
+        for key in ordered_key_list:
+            key_index = self._found_key(key)
+            if key_index != None:
+                key_indexes.append(key_index)
+
+        # Read content row by row
+        for idx, row in enumerate(tmp_content):
+            if idx > 0:
+                new_value : str = ""
+                for index in key_indexes:
+                    # In TEXT case it concatenates all text values from keys by connector delimiter
+                    # The default delimiter is space character
+                    if connector.type == MergeType.TEXT:
+                        if new_value == "":
+                            new_value = row[index]
+                        else:
+                            new_value += connector.delimiter + row[index]
+                # If the new value contains the CSV delimiter or a newline character,
+                # it could break the CSV format. To prevent this, the new value is wrapped in double quotes.
+                if connector.type == MergeType.TEXT and (self.delimiter in new_value or "\n" in new_value):
+                    new_value = '"'+ new_value +'"'
+                row.append(new_value)
+
+        # Replace original content to new one
+        self.content = tmp_content
+
+        # Delete old keys
+        if delete_old_keys:
+            self.remove_keys(ordered_key_list)
+
     
     def rename_key(self, old_key: str, new_key: str):
         if not self.content:
