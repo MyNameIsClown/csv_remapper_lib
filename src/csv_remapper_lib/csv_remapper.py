@@ -1,4 +1,5 @@
 import re
+import operator
 from enum import Enum, auto
 from dateutil import parser
 from copy import deepcopy
@@ -10,9 +11,9 @@ class MergeType(Enum):
     PERCENTAGE = auto()
 
 class ConnectorType:
-    def __init__(self, type: MergeType, action = sum, delimiter: str = " ") -> None:
+    def __init__(self, type: MergeType, operator : str = "+", delimiter: str = " ") -> None:
         self.type = type
-        self.action = action
+        self.operator = operator
         self.delimiter = delimiter
 
 class CSVFile:
@@ -99,7 +100,7 @@ class CSVFile:
         # Read content row by row
         for idx, row in enumerate(tmp_content):
             if idx > 0:
-                new_value : str = ""
+                new_value = ""
                 for index in key_indexes:
                     # In TEXT case it concatenates all text values from keys by connector delimiter
                     # The default delimiter is space character
@@ -108,10 +109,28 @@ class CSVFile:
                             new_value = row[index]
                         else:
                             new_value += connector.delimiter + row[index]
+                    elif connector.type == MergeType.NUMBER:
+                        if not isinstance(new_value, (int, float)):
+                            new_value = float(row[index])
+                        else:
+                            ops = {
+                                "+": operator.add,
+                                "-": operator.sub,
+                                "x": operator.mul,
+                                "*": operator.mul,
+                                "/": operator.truediv,
+                                "//": operator.floordiv,
+                                }
+                            
+                            fn = ops.get(connector.operator)
+                            if fn is None:
+                                raise ValueError(f"Operador desconocido: {connector.operator!r}")
+                            new_value = fn(new_value, float(row[index]))
                 # If the new value contains the CSV delimiter or a newline character,
                 # it could break the CSV format. To prevent this, the new value is wrapped in double quotes.
-                if connector.type == MergeType.TEXT and (self.delimiter in new_value or "\n" in new_value):
+                if connector.type == MergeType.TEXT and type(new_value) == str and (self.delimiter in new_value or "\n" in new_value):
                     new_value = '"'+ new_value +'"'
+                new_value = str(new_value)
                 row.append(new_value)
 
         # Replace original content to new one
