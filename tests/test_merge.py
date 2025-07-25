@@ -146,3 +146,21 @@ def test_merge_keys_time_not_a_time_error():
     with pytest.raises(ValueError) as e:
         csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
     assert "One or more values are not a date" in str(e.value)
+
+def test_merge_keys_percentage():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_percentage.csv"
+    merge_keys = ["AnnualSalary", "BonusSalary"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.PERCENTAGE)
+    csv.merge_keys(merge_keys, connector, "BonusSalary%", delete_old_keys=True)
+    csv.save(new_file_path)
+
+def test_merge_keys_percentage_base_value():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_percentage.csv"
+    merge_keys = [10000, "BonusSalary"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.PERCENTAGE)
+    csv.merge_keys(merge_keys, connector, "BonusSalary%", delete_old_keys=True)
+    csv.save(new_file_path)

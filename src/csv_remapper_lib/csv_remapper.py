@@ -94,6 +94,12 @@ class CSVFile:
         
         if not isinstance(ordered_key_list, list) or len(ordered_key_list) == 0:
             raise ValueError("Ordered key list is empty")
+        
+        # Store base_percentage_value
+        base_percentage_value = None
+        if isinstance(ordered_key_list[0], (int, float)):
+            base_percentage_value = ordered_key_list[0]
+            ordered_key_list.pop(0)
 
         # Look for index of given keys and add it to key_indexes list
         for key in ordered_key_list:
@@ -145,11 +151,17 @@ class CSVFile:
                             except ValueError:
                                 raise ValueError("One value are not numbers")
                     elif connector.type == MergeType.PERCENTAGE:
-                        # Calculates percentage in order, starting from first key value to last one.
+                        # Calculates the percentage based on two values.
+                        # The first value represents the base (100%), and the second is the portion to evaluate.
+                        # If the first value is a number (instead of a string key), it is directly treated as the base percentage.
+                        if base_percentage_value and len(ordered_key_list) != 1 or not base_percentage_value and len(ordered_key_list) != 2:
+                            raise ValueError("There are necesary only 2 keys to calculate the percentage")
+                        new_value = base_percentage_value if base_percentage_value else ""
                         if not isinstance(new_value, (int, float)):
                             new_value = float(row[index])
                         else:
-                            pass
+                            new_value = round(float(row[index])*100/new_value, 2)
+                            new_value = str(new_value) + "%"
                     elif connector.type == MergeType.TIME:
                         try:
                             if not isinstance(new_value, (int, float)):
