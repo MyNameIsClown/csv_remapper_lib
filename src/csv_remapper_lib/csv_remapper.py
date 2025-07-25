@@ -2,6 +2,7 @@ import re
 import operator
 from enum import Enum, auto
 from dateutil import parser
+from datetime import datetime
 from copy import deepcopy
 
 class MergeType(Enum):
@@ -11,10 +12,11 @@ class MergeType(Enum):
     PERCENTAGE = auto()
 
 class ConnectorType:
-    def __init__(self, type: MergeType, operator : str = "+", delimiter: str = " ") -> None:
+    def __init__(self, type: MergeType, operator : str = "+", delimiter: str = " ", time_format = "") -> None:
         self.type = type
         self.operator = operator
         self.delimiter = delimiter
+        self.time_format = time_format
 
 class CSVFile:
     def __init__(self, path: str = ""):
@@ -82,9 +84,6 @@ class CSVFile:
             - The new column is appended to the end of the header and each row.
             - If delete_old_keys is True, the original columns are removed after merging.
         """
-        if not self.content:
-            self.open_file()
-        
         tmp_content = deepcopy(self.content)
         key_indexes = []
 
@@ -126,10 +125,47 @@ class CSVFile:
                             if fn is None:
                                 raise ValueError(f"Operador desconocido: {connector.operator!r}")
                             new_value = fn(new_value, float(row[index]))
+                    elif connector.type == MergeType.PERCENTAGE:
+                        # Calculates percentage in order, starting from first key value to last one.
+                        if not isinstance(new_value, (int, float)):
+                            new_value = float(row[index])
+                        else:
+                            pass
+                    elif connector.type == MergeType.TIME:
+                        if not isinstance(new_value, (int, float)):
+                            new_value = parser.parse(row[index]).timestamp()
+                        else:
+                            ops = {
+                                "+": operator.add,
+                                "-": operator.sub,
+                                "x": operator.mul,
+                                "*": operator.mul,
+                                "/": operator.truediv,
+                                "//": operator.floordiv,
+                                }
+                            
+                            fn = ops.get(connector.operator)
+                            if fn is None:
+                                raise ValueError(f"Operador desconocido: {connector.operator!r}")
+                            # Timestamp calculated date
+                            new_value = fn(new_value, parser.parse(row[index]).timestamp())
+                    else:
+                        raise Exception("Connector type is not valid")
+
                 # If the new value contains the CSV delimiter or a newline character,
                 # it could break the CSV format. To prevent this, the new value is wrapped in double quotes.
-                if connector.type == MergeType.TEXT and type(new_value) == str and (self.delimiter in new_value or "\n" in new_value):
+                if connector.type == MergeType.TEXT and isinstance(new_value, str) and (self.delimiter in new_value or "\n" in new_value):
                     new_value = '"'+ new_value +'"'
+                # Conversor time to selected time_format
+                if connector.type == MergeType.TIME and isinstance(new_value, (int, float)):
+                    if connector.time_format == "d" or connector.time_format == "D":
+                        new_value = round(new_value/60/60/24, 2)
+                    elif connector.time_format == "m" or connector.time_format == "M":
+                        new_value = round(new_value/60/60/24/30, 2)
+                    elif connector.time_format == "y" or connector.time_format == "Y":
+                        new_value = round(new_value/60/60/24/30/12, 2)
+                    else:
+                        new_value = datetime.fromtimestamp(new_value)
                 new_value = str(new_value)
                 row.append(new_value)
 
@@ -142,9 +178,6 @@ class CSVFile:
 
     
     def rename_key(self, old_key: str, new_key: str):
-        if not self.content:
-            self.open_file()
-
         key_index = None
 
         # Found Index for matching key
@@ -156,9 +189,6 @@ class CSVFile:
             raise Exception("Old key not found")
     
     def rename_keys(self, key_dict: dict[str, str]):
-        if not self.content:
-            self.open_file()
-
         tmp_content = deepcopy(self.content)
         for old_key in key_dict.keys():
             # Found Index for matching key
@@ -171,8 +201,6 @@ class CSVFile:
         self.content = tmp_content
 
     def remove_key(self, key: str):
-        if not self.content:
-            self.open_file()
         
         key_index = None
 
@@ -186,8 +214,6 @@ class CSVFile:
             raise Exception("Key not found")
     
     def remove_keys(self, keys: list[str]):
-        if not self.content:
-            self.open_file()
         
         key_indexes = []
         for key in keys:
@@ -297,7 +323,7 @@ class CSVFile:
     def save(self, new_path: str = ""):
         save_path = new_path or self.path
         if not self.content:
-            raise ValueError("File is not open.")
+            raise ValueError("There is no csv data")
         # In this context, save does not perform any action as changes are saved immediately
         # after writing to the file in replace_key method.
         with open(save_path, 'w', encoding='utf-8') as file:

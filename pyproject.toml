@@ -9,7 +9,6 @@ license = {text = "AGPL v3"}
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "pytest (>=8.4.0,<9.0.0)",
     "python-dateutil (>=2.9.0.post0,<3.0.0)"
 ]
 
@@ -20,3 +19,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.pytest.ini_options]
 pythonpath = ["src"]
+
+[tool.poetry.group.dev.dependencies]
+pytest-cov = "^6.2.1"
+pytest = "^8.4.1"
+

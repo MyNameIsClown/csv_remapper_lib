@@ -13,7 +13,7 @@ def test_to_positive_value():
 
     assert result == 0
 
-def test_to_positive_value_full_error():
+def test_to_positive_value_key_not_found():
     key = "Unknown key"
     original_file_path = "tests/data/transform_test/sample.csv"
     csv = CSVFile(original_file_path)
@@ -29,6 +29,13 @@ def test_to_positive_value_half_error():
     assert type(result) is list
     assert len(result) == 1
 
+def test_to_positive_value_full_name():
+    test_csv_path = "tests/data/transform_test/sample_errors.csv"
+    csv = CSVFile(test_csv_path)
+    # Should process rows with missing/invalid values, but not raise if at least one is valid
+    result = csv.to_positive_number("Product Name")
+    assert result == -1
+
 def test_to_negative_value():
     key = "Unit Price"
 
@@ -41,7 +48,7 @@ def test_to_negative_value():
 
     assert result == 0
     
-def test_to_negative_value_full_error():
+def test_to_negative_value_key_not_found():
     key = "Unknown key"
     original_file_path = "tests/data/transform_test/sample.csv"
     csv = CSVFile(original_file_path)
@@ -57,6 +64,13 @@ def test_to_negative_value_half_error():
     assert type(result) is list
     assert len(result) == 1
 
+def test_to_negative_value_full_error():
+    test_csv_path = "tests/data/transform_test/sample_errors.csv"
+    csv = CSVFile(test_csv_path)
+    # Should process rows with missing/invalid values, but not raise if at least one is valid
+    result = csv.to_negative_number("Product Name")
+    assert result == -1
+
 
 def test_to_date_value():
     key = "Fecha de compra"
@@ -70,7 +84,7 @@ def test_to_date_value():
 
     assert result == 0
     
-def test_to_date_value_full_error():
+def test_to_date_value_key_not_found():
     key = "Unknown key"
     original_file_path = "tests/data/transform_test/sample_date.csv"
     csv = CSVFile(original_file_path)
@@ -86,3 +100,11 @@ def test_to_date_value_half_error():
     result = csv.to_date(key)
     assert type(result) is list
     assert len(result) == 3
+
+def test_to_date_value_full_error():
+    key = "Nombre del producto"
+    test_csv_path = "tests/data/transform_test/sample_date_errors.csv"
+    csv = CSVFile(test_csv_path)
+    # Should process rows with missing/invalid values, but not raise if at least one is valid
+    result = csv.to_date(key)
+    assert result == -1
