@@ -86,15 +86,26 @@ class CSVFile:
         """
         tmp_content = deepcopy(self.content)
         key_indexes = []
+        keys_not_found = []
 
         # Add new key at the end of list
         tmp_content[0].append(new_key_name)
+
+        
+        if not isinstance(ordered_key_list, list) or len(ordered_key_list) == 0:
+            raise ValueError("Ordered key list is empty")
 
         # Look for index of given keys and add it to key_indexes list
         for key in ordered_key_list:
             key_index = self._found_key(key)
             if key_index != None:
                 key_indexes.append(key_index)
+            else:
+                keys_not_found.append(key)
+        
+        # Raise error if there is any key at list that was not found
+        if len(keys_not_found) > 0:
+            raise ValueError("Keys: %s, were not found" % (str(keys_not_found)))
 
         # Read content row by row
         for idx, row in enumerate(tmp_content):
@@ -104,13 +115,18 @@ class CSVFile:
                     # In TEXT case it concatenates all text values from keys by connector delimiter
                     # The default delimiter is space character
                     if connector.type == MergeType.TEXT:
+                        if connector.delimiter == None:
+                            raise ValueError("Connector delimiter cannot be None for TEXT type")
                         if new_value == "":
                             new_value = row[index]
                         else:
                             new_value += connector.delimiter + row[index]
                     elif connector.type == MergeType.NUMBER:
                         if not isinstance(new_value, (int, float)):
-                            new_value = float(row[index])
+                            try:
+                                new_value = float(row[index])
+                            except ValueError:
+                                raise ValueError("One value are not numbers")  
                         else:
                             ops = {
                                 "+": operator.add,
@@ -123,8 +139,11 @@ class CSVFile:
                             
                             fn = ops.get(connector.operator)
                             if fn is None:
-                                raise ValueError(f"Operador desconocido: {connector.operator!r}")
-                            new_value = fn(new_value, float(row[index]))
+                                raise ValueError(f"Unknown operator: {connector.operator!r}")
+                            try:
+                                new_value = fn(new_value, float(row[index]))
+                            except ValueError:
+                                raise ValueError("One value are not numbers")
                     elif connector.type == MergeType.PERCENTAGE:
                         # Calculates percentage in order, starting from first key value to last one.
                         if not isinstance(new_value, (int, float)):
@@ -132,25 +151,28 @@ class CSVFile:
                         else:
                             pass
                     elif connector.type == MergeType.TIME:
-                        if not isinstance(new_value, (int, float)):
-                            new_value = parser.parse(row[index]).timestamp()
-                        else:
-                            ops = {
-                                "+": operator.add,
-                                "-": operator.sub,
-                                "x": operator.mul,
-                                "*": operator.mul,
-                                "/": operator.truediv,
-                                "//": operator.floordiv,
-                                }
-                            
-                            fn = ops.get(connector.operator)
-                            if fn is None:
-                                raise ValueError(f"Operador desconocido: {connector.operator!r}")
-                            # Timestamp calculated date
-                            new_value = fn(new_value, parser.parse(row[index]).timestamp())
+                        try:
+                            if not isinstance(new_value, (int, float)):
+                                new_value = parser.parse(row[index]).timestamp()
+                            else:
+                                ops = {
+                                    "+": operator.add,
+                                    "-": operator.sub,
+                                    "x": operator.mul,
+                                    "*": operator.mul,
+                                    "/": operator.truediv,
+                                    "//": operator.floordiv,
+                                    }
+                                
+                                fn = ops.get(connector.operator)
+                                if fn is None:
+                                    raise ValueError(f"Unknown operator: %s" % (connector.operator))
+                                # Timestamp calculated date
+                                new_value = fn(new_value, parser.parse(row[index]).timestamp())
+                        except parser.ParserError: 
+                            raise ValueError("One or more values are not a date")
                     else:
-                        raise Exception("Connector type is not valid")
+                        raise ValueError("Connector type is not valid")
 
                 # If the new value contains the CSV delimiter or a newline character,
                 # it could break the CSV format. To prevent this, the new value is wrapped in double quotes.
