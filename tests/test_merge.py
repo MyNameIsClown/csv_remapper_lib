@@ -91,8 +91,6 @@ def test_merge_keys_number_not_a_number_error():
         csv.merge_keys(merge_keys, connector, "Salary", delete_old_keys=True)
     assert "One value are not numbers" in str(e.value)
 
-
-
 def test_merge_keys_time_year_format():
     original_file_path = "tests/data/merge_test/sample.csv"
     new_file_path = "tests/data/merge_test/sample_merge_keys_time.csv"
@@ -164,3 +162,23 @@ def test_merge_keys_percentage_base_value():
     connector = ConnectorType(MergeType.PERCENTAGE)
     csv.merge_keys(merge_keys, connector, "BonusSalary%", delete_old_keys=True)
     csv.save(new_file_path)
+
+def test_merge_keys_percentage_base_error_no_enought_keys():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    merge_keys = ["BonusSalary"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.PERCENTAGE)
+    with pytest.raises(ValueError) as e:
+        csv.merge_keys(merge_keys, connector, "BonusSalary%", delete_old_keys=True)
+    
+    assert "There are necesary only 2 keys to calculate the percentage" in str(e.value)
+
+def test_merge_keys_percentage_base_error_at_number_conversion():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    merge_keys = [10000, "Name"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.PERCENTAGE)
+    with pytest.raises(ValueError) as e:
+        csv.merge_keys(merge_keys, connector, "BonusSalary%", delete_old_keys=True)
+    
+    assert re.search("Value: .+ could not be converted to number", str(e.value))

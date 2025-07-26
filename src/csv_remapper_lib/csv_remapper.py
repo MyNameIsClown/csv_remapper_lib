@@ -157,11 +157,14 @@ class CSVFile:
                         if base_percentage_value and len(ordered_key_list) != 1 or not base_percentage_value and len(ordered_key_list) != 2:
                             raise ValueError("There are necesary only 2 keys to calculate the percentage")
                         new_value = base_percentage_value if base_percentage_value else ""
-                        if not isinstance(new_value, (int, float)):
-                            new_value = float(row[index])
-                        else:
-                            new_value = round(float(row[index])*100/new_value, 2)
-                            new_value = str(new_value) + "%"
+                        try:
+                            if not isinstance(new_value, (int, float)):
+                                new_value = float(row[index])
+                            else:
+                                new_value = round(float(row[index])*100/new_value, 2)
+                                new_value = str(new_value) + "%"
+                        except ValueError as e:
+                            raise ValueError("Value: %s could not be converted to number" % (row[index]))
                     elif connector.type == MergeType.TIME:
                         try:
                             if not isinstance(new_value, (int, float)):
