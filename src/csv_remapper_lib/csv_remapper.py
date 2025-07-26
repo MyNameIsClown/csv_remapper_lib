@@ -2,39 +2,87 @@ import re
 import operator
 from enum import Enum, auto
 from dateutil import parser
-from datetime import datetime
+from datetime import datetime, timedelta, time
 from copy import deepcopy
 
+"""
+CSV Remapper Library.
+
+This module provides the CSVFile class for loading, manipulating, and saving CSV files.
+It supports operations such as renaming columns, removing columns, merging columns
+with various types, and converting data types (numbers, percentages, dates, and times).
+"""
+
 class MergeType(Enum):
+    """
+    Enumeration of supported merge operation types.
+    """
     NUMBER = auto()
     TEXT = auto()
     TIME = auto()
+    DATE = auto()
     PERCENTAGE = auto()
 
 class ConnectorType:
-    def __init__(self, type: MergeType, operator : str = "+", delimiter: str = " ", time_format = "") -> None:
+    """
+    Class used to establish the merging behavior for CSV columns.
+
+    Args:
+        type (MergeType): The type of merge operation to perform.
+        operator (str): The operator for NUMBER and DATE merge types (e.g., "+", "-", "*", "/").
+        delimiter (str): The string used to join text when using TEXT merge type.
+        time_format (str): The output format specifier for DATE merge type:
+            "d" or "D" -> Number of days
+            "m" or "M" -> Number of months
+            "y" or "Y" -> Number of years
+            "" (empty) -> ISO date (YYYY/mm/dd).
+    """
+    def __init__(self, type: MergeType, operator : str = "+", delimiter : str = " ", time_format : str = "") -> None:
         self.type = type
         self.operator = operator
         self.delimiter = delimiter
         self.time_format = time_format
 
 class CSVFile:
+    """
+    This class is used for making transformations to CSV files,
+    like renaming, removing, merging, and type conversions.
+    """
     def __init__(self, path: str = ""):
-        # Declare class variables
+        """
+        Initialize CSVFile with a file path and load its content.
+
+        Args:
+            path (str): Path to the CSV file to process.
+
+        Raises:
+            ValueError: If no path is provided.
+        """
         self.path : str = path
         self.file = None
-        self.content : list[list] = []
-        self.delimiter : str = "," # Base delimiter
-        self.open_file()
+        self.content : list[list] = [] # Holds CSV data as list of rows
+        self.delimiter : str = "," # Default delimiter before detection
+        self.open_file() # Load file contents into memory
         
     def open_file(self):
+        """
+        Open and read the CSV file, detect its delimiter,
+        replace Spanish-style floats, and load content into rows.
+
+        Returns:
+            file object: The opened file handle.
+
+        Raises:
+            ValueError: If the path is not provided.
+        """
         if not self.path:
             raise ValueError("Path to the CSV file is not provided.")
+        # Read entire file into string for preprocessing
         with open(self.path, 'r', encoding='utf-8') as file:
             self.file = file
             str_content = file.read()
-            # First replace float with comma, typically used on spanish alphabet, to english float numbers
-            counter = 0
+
+            # Convert quoted Spanish floats (e.g., "123,45") to standard format 123.45
             spanish_float_numbers : list[str] = re.findall('"[0-9]+,[0-9]+"', str_content)
             for spanish_number in spanish_float_numbers:
                 # Delete " simbol, then divide the numbers by comma. Replace the original number by new one using dot instead comma
@@ -42,11 +90,13 @@ class CSVFile:
                 new_number = '%s.%s' % (new_number_divided[0], new_number_divided[1])
                 str_content = str_content.replace(spanish_number, new_number)
 
-            # Decompressing String info to list of lists
+            # Split text into lines and detect delimiter from header row
+            counter = 0
             for line in str_content.split("\n"):
                 # To look for the delimiter of the csv file we are comparing the number of times
                 # that one of each posibilities apears at keys row. It has to be 1 time less than the number of keys.
                 if counter == 0:
+                    # Evaluate common delimiters and pick the one matching header columns
                     posible_delimiters = {
                         ",": line.count(","),
                         ";": line.count(";"),
@@ -64,46 +114,70 @@ class CSVFile:
         return self.file
     
     def close_file(self):
+        """
+        Close the file handle if it is currently open.
+        """
         if self.file:
             self.file.close()
             self.file = None
+            self.content = []
     
     def merge_keys(self, ordered_key_list: list[str], connector: ConnectorType, new_key_name: str, delete_old_keys: bool = True) -> None:
         """
-        Merges multiple columns (keys) in the CSV content into a new column using a specified connector.
-        Args:
-            ordered_key_list (list[str]): List of column names to merge, in the order they should be combined.
-            connector (ConnectorType): The value or function used to join the column values (e.g., a string separator).
-            new_key_name (str): The name of the new column that will contain the merged values.
-            delete_old_keys (bool, optional): If True, the original columns will be removed after merging. Defaults to True.
-        Raises:
-            FileNotFoundError: If the CSV content is not loaded and cannot be opened.
-            KeyError: If any of the specified keys are not found in the CSV header.
-        Notes:
-            - The method modifies the CSV content in place.
-            - The new column is appended to the end of the header and each row.
-            - If delete_old_keys is True, the original columns are removed after merging.
-        """
-        tmp_content = deepcopy(self.content)
-        key_indexes = []
-        keys_not_found = []
+        Merge multiple columns into a single new column based on connector settings.
 
-        # Add new key at the end of list
+        Args:
+            ordered_key_list (list[str]): Column names to merge, in sequence.
+            connector (ConnectorType): Defines how values combine:
+
+                For MergeType.TEXT, concatenates strings using connector.delimiter (default is " ").
+                For MergeType.NUMBER, applies connector.operator (e.g., "+" by default) between numeric values.
+                For MergeType.PERCENTAGE, needs exactly two values per row or a numeric base and one column name:
+                  first element can be a number (constant base) or a column name (base per row);
+                  calculates second value as percentage of base and appends "%".
+                For MergeType.DATE, requires at least two dates per row;
+                  parses to timestamps, applies connector.operator, then formats according to connector.time_format:
+                    "d"/"D" for days, "m"/"M" for months, "y"/"Y" for years,
+                    or ISO date (YYYY-MM-DD) if empty.
+                For MergeType.TIME, requires at least two ISO-format time strings per row;
+                  converts to timedeltas and applies connector.operator, returning an ISO 8601 duration.
+
+            new_key_name (str): Column header for merged data.
+            delete_old_keys (bool): Remove original columns after merging if True.
+
+        Raises:
+            ValueError: On empty key list, missing keys, invalid connector settings, or merge errors.
+        """
+        # Create a working copy to avoid mutating original content
+        tmp_content = deepcopy(self.content)
+        key_indexes = [] # Store column indices for merging
+        keys_not_found = [] # Track keys not found in header
+        # Map string operators to actual functions
+        ops = {
+                "+": operator.add,
+                "-": operator.sub,
+                "x": operator.mul,
+                "*": operator.mul,
+                "/": operator.truediv,
+                "//": operator.floordiv,
+                }
+
+        # Append header for new merged column
         tmp_content[0].append(new_key_name)
 
         
         if not isinstance(ordered_key_list, list) or len(ordered_key_list) == 0:
             raise ValueError("Ordered key list is empty")
         
-        # Store base_percentage_value
+        # Optional base value for percentage merges
         base_percentage_value = None
         if isinstance(ordered_key_list[0], (int, float)):
             base_percentage_value = ordered_key_list[0]
             ordered_key_list.pop(0)
 
-        # Look for index of given keys and add it to key_indexes list
+        # Resolve header names to column indexes
         for key in ordered_key_list:
-            key_index = self._found_key(key)
+            key_index = self.__found_key(key)
             if key_index != None:
                 key_indexes.append(key_index)
             else:
@@ -113,112 +187,134 @@ class CSVFile:
         if len(keys_not_found) > 0:
             raise ValueError("Keys: %s, were not found" % (str(keys_not_found)))
 
-        # Read content row by row
+        # Iterate over each data row to compute merged value
         for idx, row in enumerate(tmp_content):
-            if idx > 0:
-                new_value = ""
-                for index in key_indexes:
-                    # In TEXT case it concatenates all text values from keys by connector delimiter
-                    # The default delimiter is space character
-                    if connector.type == MergeType.TEXT:
-                        if connector.delimiter == None:
-                            raise ValueError("Connector delimiter cannot be None for TEXT type")
-                        if new_value == "":
-                            new_value = row[index]
-                        else:
-                            new_value += connector.delimiter + row[index]
-                    elif connector.type == MergeType.NUMBER:
+            if idx == 0:
+                continue # Skip header row
+            new_value = ""
+            for index in key_indexes:
+                if connector.type == MergeType.TEXT:
+                    # Perform text concatenation
+                    if connector.delimiter == None:
+                        raise ValueError("Connector delimiter cannot be None for TEXT type")
+                    if new_value == "":
+                        new_value = row[index]
+                    else:
+                        new_value += connector.delimiter + row[index]
+                elif connector.type == MergeType.NUMBER:
+                    # Numeric operations (add/subtract/etc.)
+                    if not isinstance(new_value, (int, float)):
+                        try:
+                            new_value = float(row[index])
+                        except ValueError:
+                            raise ValueError("One value are not numbers")  
+                    else:
+                        fn = ops.get(connector.operator)
+                        if fn is None:
+                            raise ValueError(f"Unknown operator: {connector.operator!r}")
+                        try:
+                            new_value = fn(new_value, float(row[index]))
+                        except ValueError:
+                            raise ValueError("One value are not numbers")
+                elif connector.type == MergeType.PERCENTAGE:
+                    # Percentage: calculate value relative to base_pct or first column
+                    if base_percentage_value and len(ordered_key_list) != 1 or not base_percentage_value and len(ordered_key_list) != 2:
+                        raise ValueError("There are necesary only 2 keys to calculate the percentage")
+                    new_value = base_percentage_value if base_percentage_value else ""
+                    try:
                         if not isinstance(new_value, (int, float)):
-                            try:
-                                new_value = float(row[index])
-                            except ValueError:
-                                raise ValueError("One value are not numbers")  
+                            new_value = float(row[index])
                         else:
-                            ops = {
-                                "+": operator.add,
-                                "-": operator.sub,
-                                "x": operator.mul,
-                                "*": operator.mul,
-                                "/": operator.truediv,
-                                "//": operator.floordiv,
-                                }
-                            
+                            new_value = round(float(row[index])*100/new_value, 2)
+                            new_value = str(new_value) + "%"
+                    except ValueError as e:
+                        raise ValueError("Value: %s could not be converted to number" % (row[index]))
+                elif connector.type == MergeType.DATE:
+                    # Date arithmetic using timestamps
+                    try:
+                        if not isinstance(new_value, (int, float)):
+                            new_value = parser.parse(row[index]).timestamp()
+                        else:
                             fn = ops.get(connector.operator)
                             if fn is None:
-                                raise ValueError(f"Unknown operator: {connector.operator!r}")
-                            try:
-                                new_value = fn(new_value, float(row[index]))
-                            except ValueError:
-                                raise ValueError("One value are not numbers")
-                    elif connector.type == MergeType.PERCENTAGE:
-                        # Calculates the percentage based on two values.
-                        # The first value represents the base (100%), and the second is the portion to evaluate.
-                        # If the first value is a number (instead of a string key), it is directly treated as the base percentage.
-                        if base_percentage_value and len(ordered_key_list) != 1 or not base_percentage_value and len(ordered_key_list) != 2:
-                            raise ValueError("There are necesary only 2 keys to calculate the percentage")
-                        new_value = base_percentage_value if base_percentage_value else ""
+                                raise ValueError(f"Unknown operator: %s" % (connector.operator))
+                            # Timestamp calculated date
+                            new_value = fn(new_value, parser.parse(row[index]).timestamp())
+                    except parser.ParserError: 
+                        raise ValueError("One or more values are not a date")
+                elif connector.type == MergeType.TIME:
+                    # Time arithmetic using timedeltas
+                    if not isinstance(new_value, (timedelta)):
+                        # Time sould have ISO format %T:%M:%s
                         try:
-                            if not isinstance(new_value, (int, float)):
-                                new_value = float(row[index])
-                            else:
-                                new_value = round(float(row[index])*100/new_value, 2)
-                                new_value = str(new_value) + "%"
-                        except ValueError as e:
-                            raise ValueError("Value: %s could not be converted to number" % (row[index]))
-                    elif connector.type == MergeType.TIME:
+                            time_from_str = time.fromisoformat(row[index])
+                        except ValueError: 
+                            raise ValueError("Invalid time isoformat string: %s" % (row[index]))
+                        
+                        new_value = timedelta(
+                            hours=time_from_str.hour,
+                            minutes=time_from_str.minute,
+                            seconds=time_from_str.second
+                        )
+                    else:
+                        fn = ops.get(connector.operator)
+                        if fn is None:
+                            raise ValueError(f"Unknown operator: %s" % (connector.operator))
                         try:
-                            if not isinstance(new_value, (int, float)):
-                                new_value = parser.parse(row[index]).timestamp()
-                            else:
-                                ops = {
-                                    "+": operator.add,
-                                    "-": operator.sub,
-                                    "x": operator.mul,
-                                    "*": operator.mul,
-                                    "/": operator.truediv,
-                                    "//": operator.floordiv,
-                                    }
-                                
-                                fn = ops.get(connector.operator)
-                                if fn is None:
-                                    raise ValueError(f"Unknown operator: %s" % (connector.operator))
-                                # Timestamp calculated date
-                                new_value = fn(new_value, parser.parse(row[index]).timestamp())
-                        except parser.ParserError: 
-                            raise ValueError("One or more values are not a date")
-                    else:
-                        raise ValueError("Connector type is not valid")
+                            time_from_str = time.fromisoformat(row[index])
+                        except ValueError: 
+                            raise ValueError("Invalid time isoformat string: %s" % (row[index]))
+                        new_value = fn(
+                            new_value, 
+                            timedelta(
+                                hours=time_from_str.hour,
+                                minutes=time_from_str.minute,
+                                seconds=time_from_str.second
+                            )
+                        )
+                    
+                else:
+                    raise ValueError("Connector type is not valid")
+            
+            # Format date result according to time_format specifier
+            if connector.type == MergeType.DATE and isinstance(new_value, (int, float)):
+                if connector.time_format == "d" or connector.time_format == "D":
+                    new_value = round(new_value/60/60/24, 2)
+                elif connector.time_format == "m" or connector.time_format == "M":
+                    new_value = round(new_value/60/60/24/30, 2)
+                elif connector.time_format == "y" or connector.time_format == "Y":
+                    new_value = round(new_value/60/60/24/30/12, 2)
+                else:
+                    new_value = datetime.fromtimestamp(new_value).date()
 
-                # If the new value contains the CSV delimiter or a newline character,
-                # it could break the CSV format. To prevent this, the new value is wrapped in double quotes.
-                if connector.type == MergeType.TEXT and isinstance(new_value, str) and (self.delimiter in new_value or "\n" in new_value):
-                    new_value = '"'+ new_value +'"'
-                # Conversor time to selected time_format
-                if connector.type == MergeType.TIME and isinstance(new_value, (int, float)):
-                    if connector.time_format == "d" or connector.time_format == "D":
-                        new_value = round(new_value/60/60/24, 2)
-                    elif connector.time_format == "m" or connector.time_format == "M":
-                        new_value = round(new_value/60/60/24/30, 2)
-                    elif connector.time_format == "y" or connector.time_format == "Y":
-                        new_value = round(new_value/60/60/24/30/12, 2)
-                    else:
-                        new_value = datetime.fromtimestamp(new_value)
-                new_value = str(new_value)
-                row.append(new_value)
+            new_value = str(new_value)
 
-        # Replace original content to new one
+            # Quote merged value if it contains delimiter or newline
+            if isinstance(new_value, str) and (self.delimiter in new_value or "\n" in new_value):
+                new_value = '"'+ new_value +'"'
+            row.append(new_value)
+
+        # Commit merged content and optionally drop original columns
         self.content = tmp_content
-
-        # Delete old keys
         if delete_old_keys:
             self.remove_keys(ordered_key_list)
 
     
     def rename_key(self, old_key: str, new_key: str):
+        """
+        Rename a single column in the CSV header.
+
+        Args:
+            old_key (str): Existing column name to replace.
+            new_key (str): New column name.
+
+        Raises:
+            KeyError: If old_key is not found.
+        """
         key_index = None
 
         # Found Index for matching key
-        key_index = self._found_key(old_key)
+        key_index = self.__found_key(old_key)
 
         if key_index != None:
             self.content[0][key_index] = new_key
@@ -226,10 +322,19 @@ class CSVFile:
             raise Exception("Old key not found")
     
     def rename_keys(self, key_dict: dict[str, str]):
+        """
+        Rename multiple columns based on a mapping dictionary.
+
+        Args:
+            key_map (dict): Mapping of old_key to new_key.
+
+        Raises:
+            KeyError: If any old_key in mapping is not found.
+        """
         tmp_content = deepcopy(self.content)
         for old_key in key_dict.keys():
             # Found Index for matching key
-            key_index = self._found_key(old_key)
+            key_index = self.__found_key(old_key)
             if key_index == None:
                 raise Exception("One or more key in dict not found")
                 
@@ -238,11 +343,19 @@ class CSVFile:
         self.content = tmp_content
 
     def remove_key(self, key: str):
-        
+        """
+        Remove a single column from the CSV content.
+
+        Args:
+            key (str): Column name to remove.
+
+        Raises:
+            KeyError: If key is not found.
+        """
         key_index = None
 
         # Found Index for matching key
-        key_index = self._found_key(key)
+        key_index = self.__found_key(key)
 
         if key_index != None:
             for row in self.content:
@@ -251,10 +364,18 @@ class CSVFile:
             raise Exception("Key not found")
     
     def remove_keys(self, keys: list[str]):
-        
+        """
+        Remove multiple columns from the CSV content.
+
+        Args:
+            keys (list): List of column names to remove.
+
+        Raises:
+            KeyError: If any key is not found.
+        """
         key_indexes = []
         for key in keys:
-            key_indexes.append(self._found_key(key))
+            key_indexes.append(self.__found_key(key))
         
         if None not in key_indexes:
             # IMPORTANT: Order indexes desc to delete last items first
@@ -268,11 +389,19 @@ class CSVFile:
         
     def to_positive_number(self, key: str) -> int | list[int]:
         """
-        This method transforms all values of given key to positive number.
-        If it were posible to transform any value then returns 0, if not then return -1 and 
-        if there was errors at some values then return a list of row index, the 0 index indicates the row of the keys
+        Convert all values in the specified column to their absolute (positive) values.
+
+        Args:
+            key (str): Column name to convert.
+
+        Returns:
+            int: 0 if all conversions succeeded, -1 if none succeeded.
+            list[int]: List of row indices where conversion failed (header row is 0).
+
+        Raises:
+            KeyError: If key is not found.
         """
-        key_index = self._found_key(key)
+        key_index = self.__found_key(key)
         if key_index is None:
             raise Exception("Key not found")
         error_row_indexes = []
@@ -299,11 +428,19 @@ class CSVFile:
     
     def to_negative_number(self, key: str) -> int | list[int]:
         """
-        This method transforms all values of given key to negative number.
-        If it were posible to transform any value then returns 0, if not then return -1 and 
-        if there was errors at some values then return a list of row index, the 0 index indicates the row of the keys
+        Convert all values in the specified column to negative values.
+
+        Args:
+            key (str): Column name to convert.
+
+        Returns:
+            int: 0 if all conversions succeeded, -1 if none succeeded.
+            list[int]: List of row indices where conversion failed (header row is 0).
+
+        Raises:
+            KeyError: If key is not found.
         """
-        key_index = self._found_key(key)
+        key_index = self.__found_key(key)
         if key_index is None:
             raise Exception("Key not found")
         error_row_indexes = []
@@ -330,11 +467,19 @@ class CSVFile:
 
     def to_date(self, key: str) -> int | list[int]:
         """
-        This method transforms all values of given key to date.
-        If it were posible to transform any value then returns 0, if not then return -1 and 
-        if there was errors at some values then return a list of row index, the 0 index indicates the row of the keys
+        Parse all values in the specified column into ISO date strings (YYYY-MM-DD).
+
+        Args:
+            key (str): Column name to convert.
+
+        Returns:
+            int: 0 if all conversions succeeded, -1 if none succeeded.
+            list[int]: List of row indices where conversion failed (header row is 0).
+
+        Raises:
+            KeyError: If key is not found.
         """
-        key_index = self._found_key(key)
+        key_index = self.__found_key(key)
         if key_index is None:
             raise Exception("Key not found")
         error_row_indexes = []
@@ -358,6 +503,15 @@ class CSVFile:
             return error_row_indexes
 
     def save(self, new_path: str = ""):
+        """
+        Write current CSV content back to file, overwriting or to a new path.
+
+        Args:
+            new_path (str): Optional new file path. If empty, overwrite original file.
+
+        Raises:
+            ValueError: If there is no content to save.
+        """
         save_path = new_path or self.path
         if not self.content:
             raise ValueError("There is no csv data")
@@ -376,8 +530,16 @@ class CSVFile:
 
             file.write(str_content)
     
-    def _found_key(self, key: str = ""):
-        """Found key on keys row"""
+    def __found_key(self, key: str = ""):
+        """
+        Find the index of a column name in the header row.
+
+        Args:
+            key (str): Column name to search for.
+
+        Returns:
+            int: Index of the column, or None if not found.
+        """
         for idx, csv_key in enumerate(self.content[0]):
             if key == csv_key:
                 return idx

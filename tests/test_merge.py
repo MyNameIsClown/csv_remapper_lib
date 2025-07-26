@@ -91,59 +91,104 @@ def test_merge_keys_number_not_a_number_error():
         csv.merge_keys(merge_keys, connector, "Salary", delete_old_keys=True)
     assert "One value are not numbers" in str(e.value)
 
-def test_merge_keys_time_year_format():
+def test_merge_keys_date_year_format():
     original_file_path = "tests/data/merge_test/sample.csv"
-    new_file_path = "tests/data/merge_test/sample_merge_keys_time.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_date.csv"
     merge_keys = ["RetirementDate", "HiringDate"]
     csv = CSVFile(original_file_path)
-    connector = ConnectorType(MergeType.TIME, time_format="y", operator="-")
+    connector = ConnectorType(MergeType.DATE, time_format="y", operator="-")
     csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
     csv.save(new_file_path)
 
-def test_merge_keys_time_day_format():
+def test_merge_keys_date_day_format():
     original_file_path = "tests/data/merge_test/sample.csv"
-    new_file_path = "tests/data/merge_test/sample_merge_keys_time.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_date.csv"
     merge_keys = ["RetirementDate", "HiringDate"]
     csv = CSVFile(original_file_path)
-    connector = ConnectorType(MergeType.TIME, time_format="d", operator="-")
+    connector = ConnectorType(MergeType.DATE, time_format="d", operator="-")
     csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
     csv.save(new_file_path)
 
-def test_merge_keys_time_month_format():
+def test_merge_keys_date_month_format():
     original_file_path = "tests/data/merge_test/sample.csv"
-    new_file_path = "tests/data/merge_test/sample_merge_keys_time.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_date.csv"
     merge_keys = ["RetirementDate", "HiringDate"]
     csv = CSVFile(original_file_path)
-    connector = ConnectorType(MergeType.TIME, time_format="m", operator="-")
+    connector = ConnectorType(MergeType.DATE, time_format="m", operator="-")
     csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
     csv.save(new_file_path)
 
-def test_merge_keys_time_regular_date_format():
+def test_merge_keys_date_regular_date_format():
     original_file_path = "tests/data/merge_test/sample.csv"
-    new_file_path = "tests/data/merge_test/sample_merge_keys_time.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_date.csv"
     merge_keys = ["RetirementDate", "HiringDate"]
     csv = CSVFile(original_file_path)
-    connector = ConnectorType(MergeType.TIME)
+    connector = ConnectorType(MergeType.DATE)
     csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
     csv.save(new_file_path)
 
-def test_merge_keys_time_operator_not_found():
+def test_merge_keys_date_operator_not_found():
     original_file_path = "tests/data/merge_test/sample.csv"
     merge_keys = ["RetirementDate", "HiringDate"]
     csv = CSVFile(original_file_path)
-    connector = ConnectorType(MergeType.TIME, time_format="y", operator="Unknown operator")
+    connector = ConnectorType(MergeType.DATE, time_format="y", operator="Unknown operator")
     with pytest.raises(ValueError) as e:
         csv.merge_keys(merge_keys, connector, "Salary", delete_old_keys=True)
     assert re.search("Unknown operator: .+", str(e.value))
 
-def test_merge_keys_time_not_a_time_error():
+def test_merge_keys_date_not_a_date_error():
     original_file_path = "tests/data/merge_test/sample.csv"
     merge_keys = ["RetirementDate", "Name"]
     csv = CSVFile(original_file_path)
-    connector = ConnectorType(MergeType.TIME, time_format="d", operator="-")
+    connector = ConnectorType(MergeType.DATE, time_format="d", operator="-")
     with pytest.raises(ValueError) as e:
         csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
     assert "One or more values are not a date" in str(e.value)
+
+def test_merge_keys_time():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_time.csv"
+    merge_keys = ["WorkStartingHour", "WorkEndingHour"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.TIME)
+    csv.merge_keys(merge_keys, connector, "WorkingTime", delete_old_keys=False)
+    csv.save(new_file_path)
+
+def test_merge_keys_time_diference():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    new_file_path = "tests/data/merge_test/sample_merge_keys_time.csv"
+    merge_keys = ["WorkEndingHour", "WorkStartingHour"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.TIME, operator="-")
+    csv.merge_keys(merge_keys, connector, "WorkingTime", delete_old_keys=False)
+    csv.save(new_file_path)
+
+def test_merge_keys_time_operator_not_found():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    merge_keys = ["WorkEndingHour", "WorkStartingHour"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.TIME, operator="Unknown operator")
+    with pytest.raises(ValueError) as e:
+        csv.merge_keys(merge_keys, connector, "Salary", delete_old_keys=True)
+    assert re.search("Unknown operator: .+", str(e.value))
+
+def test_merge_keys_time_not_a_time_error_first_key():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    merge_keys = ["WorkStartingHour", "Name"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.TIME, operator="-")
+    with pytest.raises(ValueError) as e:
+        csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
+    assert re.search("Invalid time isoformat string: .+", str(e.value))
+
+def test_merge_keys_time_not_a_time_error_second_key():
+    original_file_path = "tests/data/merge_test/sample.csv"
+    merge_keys = ["Name", "WorkStartingHour"]
+    csv = CSVFile(original_file_path)
+    connector = ConnectorType(MergeType.TIME, operator="-")
+    with pytest.raises(ValueError) as e:
+        csv.merge_keys(merge_keys, connector, "Contact days", delete_old_keys=True)
+    assert re.search("Invalid time isoformat string: .+", str(e.value))
 
 def test_merge_keys_percentage():
     original_file_path = "tests/data/merge_test/sample.csv"
