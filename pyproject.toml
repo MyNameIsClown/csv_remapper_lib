@@ -1,11 +1,11 @@
 [tool.poetry]
 name = "csv_remapper_lib"
-version = "0.8.1"
+version = "1.0.0"
 description = "A library for remapping CSV files based on a mapping file."
-authors = ["Víctor Carrasco"]
+authors = ["Víctor Carrasco <vc.business.oo@gmail.com>"]
 license = "AGPL v3"
 readme = "README.md"
-packages = [{ include = "csv_remapper_lib" }]
+packages = [{ include = "csv_remapper_lib", from = "src" }]
 homepage = "https://github.com/MyNameIsClown/csv_remapper_lib"
 repository = "https://github.com/MyNameIsClown/csv_remapper_lib"
 keywords = ["csv", "remap", "data"]
@@ -29,6 +29,3 @@ pythonpath = ["src"]
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
-
-[tool.poetry.config]
-virtualenvs.in-project = true

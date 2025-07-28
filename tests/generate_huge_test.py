@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 # Generate huge CSV for testing
 data_dir = "tests/data"
 os.makedirs(data_dir, exist_ok=True)
-data_path = os.path.join(data_dir, "huge_test.csv")
+data_path = os.path.join(data_dir, "huge_sample.csv")
 
 first_names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Hector']
 last_names = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Miller', 'Davis']
