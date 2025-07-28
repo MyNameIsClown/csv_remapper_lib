@@ -381,9 +381,12 @@ class CSVFile:
             # IMPORTANT: Order indexes desc to delete last items first
             key_indexes.sort(reverse=True)
 
-            for row in self.content:
+            for idx, row in enumerate(self.content):
                 for key in key_indexes:
-                    row.pop(key)
+                    try:
+                        row.pop(key)
+                    except IndexError as e:
+                        raise ValueError("The %s row: %s have not enought elemnts: Index out of range" % (str(idx), str(row)))
         else:
             raise Exception("One or more keys not found")
         
