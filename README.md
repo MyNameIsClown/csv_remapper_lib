@@ -10,8 +10,6 @@
 - **Convert values to positive:** Transform numeric values to their absolute value by key.
 - **Convert values to negative:** Transform numeric values to negative by key.
 - **Normalize dates:** Standardize date formats in selected columns.
-- **Convert values to text:** Transform column values to text (default behavior).
-- **Undo and redo changes:** Easily undo or redo the last modification.
 
 ## Why use CSV Remapper?
 
@@ -23,7 +21,7 @@
 ## Installation
 
 ```bash
-pip install csv-remapper
+pip install csv-remapper-lib
 ```
 
 ## Usage Example
@@ -31,8 +29,9 @@ pip install csv-remapper
 ```python
 from csv_remapper_lib import CsvRemapper
 
-remapper = CsvRemapper(mapping_file='mapping.json')
-remapper.rename_key("example_key", "new_key")
+csv = CsvRemapper("data.csv")
+csv.rename_key("example_key", "new_key")
+csv.save("data.csv")
 ```
 
 ## Contributing
