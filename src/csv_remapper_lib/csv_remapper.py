@@ -93,6 +93,9 @@ class CSVFile:
             # Split text into lines and detect delimiter from header row
             counter = 0
             for line in str_content.split("\n"):
+                # Skip empty lines
+                if len(line) == 0:
+                    continue
                 # To look for the delimiter of the csv file we are comparing the number of times
                 # that one of each posibilities apears at keys row. It has to be 1 time less than the number of keys.
                 if counter == 0:
@@ -523,13 +526,15 @@ class CSVFile:
         with open(save_path, 'w', encoding='utf-8') as file:
             # Compression algorithim
             str_content = ""
-            for row in self.content:
-                for idx, item in enumerate(row):
-                    if idx == 0:
+            for row_idx, row in enumerate(self.content):
+                for item_idx, item in enumerate(row):
+                    if item_idx == 0:
                         str_content += item
                     else:
                         str_content += self.delimiter + item
-                str_content += "\n"
+                # Prevent to add new line character to end of file
+                if row_idx + 1 != len(self.content):
+                    str_content += "\n"
 
             file.write(str_content)
     
