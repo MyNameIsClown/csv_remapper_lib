@@ -5,11 +5,12 @@
 ## Key Features
 
 - **Rename columns:** Effortlessly rename columns based on your mapping rules.
-- **Remove columns:** Delete specific columns by key to clean your data.
+- **Remove columns:** Effortlessly rename columns based on your mapping rules.
 - **Merge columns:** Combine values from multiple columns, choosing the order and separator.
 - **Convert values to positive:** Transform numeric values to their absolute value by key.
 - **Convert values to negative:** Transform numeric values to negative by key.
 - **Normalize dates:** Standardize date formats in selected columns.
+- **Convert to JSON:** Convert CSV format to JSON.
 
 ## Why use CSV Remapper?
 

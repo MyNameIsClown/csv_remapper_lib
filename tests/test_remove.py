@@ -75,3 +75,15 @@ def test_remove_keys_error():
         csv.remove_keys(keys)
     
     assert "One or more keys not found" in str(exc_info.value)
+
+def test_remove_keys_error_lenght():
+    keys = ["Total Price"]
+    original_file_path = "tests/data/remove_test/sample_remove_key_no_enought_elements.csv"
+
+    # Creating CSVFile, replacing key and save it
+    csv = CSVFile(path=original_file_path)
+
+    with pytest.raises(Exception) as exc_info:
+        csv.remove_keys(keys)
+    
+    assert "have not enought elemnts: Index out of range" in str(exc_info.value)

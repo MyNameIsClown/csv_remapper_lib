@@ -61,6 +61,7 @@ class CSVFile:
         self.path : str = path
         self.file = None
         self.content : list[list] = [] # Holds CSV data as list of rows
+        self.content_keys : list = []
         self.delimiter : str = "," # Default delimiter before detection
         self.open_file() # Load file contents into memory
         
@@ -112,8 +113,11 @@ class CSVFile:
                             self.delimiter = delimiter_key
                             break
                 # Adding lists of items to content splitted by calculated delimiter 
-                self.content.append(line.split(self.delimiter))
+                raw_cells = line.split(self.delimiter)
+                types_cells = [self.__infer_type(c) for c in raw_cells]
+                self.content.append(types_cells)
                 counter += 1
+            self.content_keys = self.content[0]
         return self.file
     
     def close_file(self):
@@ -235,14 +239,19 @@ class CSVFile:
                 elif connector.type == MergeType.DATE:
                     # Date arithmetic using timestamps
                     try:
+                        if isinstance(row[index], datetime):
+                            value_timestamp = row[index].timestamp()
+                        else:
+                            value_timestamp = parser.parse(row[index]).timestamp()
+
                         if not isinstance(new_value, (int, float)):
-                            new_value = parser.parse(row[index]).timestamp()
+                            new_value = value_timestamp
                         else:
                             fn = ops.get(connector.operator)
                             if fn is None:
                                 raise ValueError(f"Unknown operator: %s" % (connector.operator))
                             # Timestamp calculated date
-                            new_value = fn(new_value, parser.parse(row[index]).timestamp())
+                            new_value = fn(new_value, value_timestamp)
                     except parser.ParserError: 
                         raise ValueError("One or more values are not a date")
                 elif connector.type == MergeType.TIME:
@@ -494,7 +503,10 @@ class CSVFile:
             if idx > 0:
                 try:
                     value_to_change = row[key_index]
-                    new_value = str(parser.parse(value_to_change).date())
+                    if isinstance(value_to_change, datetime):
+                        new_value = str(value_to_change.date())
+                    else:
+                        new_value = str(parser.parse(value_to_change).date())
                     row[key_index] = new_value
                 except parser.ParserError as e:
                     error_row_indexes.append(idx)
@@ -528,6 +540,7 @@ class CSVFile:
             str_content = ""
             for row_idx, row in enumerate(self.content):
                 for item_idx, item in enumerate(row):
+                    item = str(item)
                     if item_idx == 0:
                         str_content += item
                     else:
@@ -537,7 +550,76 @@ class CSVFile:
                     str_content += "\n"
 
             file.write(str_content)
-    
+
+    def to_json(self) -> list[dict]:
+        """
+        Convert the CSV content to a list of dictionaries (JSON-like structure).
+
+        Returns:
+            list[dict]: List of dictionaries, each representing a row with column names as keys.
+
+        Raises:
+            ValueError: If there is no CSV data loaded.
+        """
+        if not self.content:
+            raise ValueError("There is no CSV data")
+        json_content = []
+        for row_idx, row in enumerate(self.content):
+            if row_idx > 0:
+                json_row = {}
+                for item_idx, item in enumerate(row):
+                    json_row[self.content_keys[item_idx]] = item
+                json_content.append(json_row)
+        return json_content
+
+    def type_of(self, key_name: str):
+        """
+        Get the data type of all values in the specified column.
+
+        Args:
+            key_name (str): The column name to check.
+
+        Returns:
+            type: The type if all values in the column are of the same type, otherwise None.
+
+        Raises:
+            ValueError: If there is no CSV content or key_name is invalid.
+        """
+        if not self.content:
+            raise ValueError("There is no CSV content")
+        if not key_name or not isinstance(key_name, str):
+            raise ValueError("The key_name is missing or not a string")
+        key_idx = self.__found_key(key_name)
+        # Get a set of all types present in the column values (excluding header)
+        key_type_values = {type(value[key_idx]) for value in self.content[1:]}
+        # If only one type exists, return it; otherwise, return None
+        return key_type_values.pop() if key_type_values and len(key_type_values) == 1 else None
+
+    def all_key_types(self):
+        """
+        Get the data type for each column in the CSV.
+
+        Returns:
+            dict: Dictionary mapping column names to their data type (or None if mixed types).
+
+        Raises:
+            ValueError: If there is no CSV content or header is invalid.
+        """
+        if not self.content:
+            raise ValueError("There is no CSV content")
+        if not self.content_keys or not isinstance(self.content_keys, list):
+            raise ValueError("The header row is missing or invalid")
+        key_type_dict = {}
+        for key in self.content_keys:
+            key_idx = self.__found_key(key)
+            # Get a set of all types present in the column values (excluding header)
+            key_type_values = {type(value[key_idx]) for value in self.content[1:]}
+            # If only one type exists, use it; otherwise, set as None
+            key_type = key_type_values.pop() if key_type_values and len(key_type_values) == 1 else None
+            key_type_dict[key] = key_type
+
+        return key_type_dict
+
     def __found_key(self, key: str = ""):
         """
         Find the index of a column name in the header row.
@@ -551,4 +633,35 @@ class CSVFile:
         for idx, csv_key in enumerate(self.content[0]):
             if key == csv_key:
                 return idx
-        return None    
+        return None
+    
+    def __infer_type(self, s: str):
+        """
+        Attempt to infer the type of the input string.
+
+        Tries to convert the input string to:
+            1. int (if it matches an integer pattern)
+            2. float (if it matches a decimal number pattern)
+            3. datetime (if it matches known date formats: YYYY-MM-DD or DD/MM/YYYY)
+            4. str (if none of the above patterns match)
+
+        Args:
+            s (str): The input string to infer type for.
+
+        Returns:
+            int | float | datetime | str: The value converted to the inferred type, or the original string if no match.
+        """
+        # 1) Try integer (e.g., "123" or "-123")
+        if re.fullmatch(r"-?\d+", s):
+            return int(s)
+        # 2) Try float (e.g., "123.45" or "-123.45")
+        if re.fullmatch(r"-?\d+\.\d+", s):
+            return float(s)
+        # 3) Try date (formats: "2025-08-07" or "07/08/2025")
+        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+            try:
+                return datetime.strptime(s, fmt)
+            except ValueError:
+                pass
+        # 4) If no match, return as string
+        return s

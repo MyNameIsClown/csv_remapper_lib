@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "csv_remapper_lib"
-version = "1.1.0"
+version = "1.2.0"
 description = "A library for remapping CSV files based on a mapping file."
 authors = ["Víctor Carrasco <vc.business.oo@gmail.com>"]
 license = "AGPL v3"
