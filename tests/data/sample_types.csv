@@ -1,0 +1,11 @@
+Item;Category;Quantity;Unit Price;Total Price;Date
+Milk;Dairy;2;1.50;3.00;2025-08-07
+Bread;Bakery;1;2.00;2.00;07/08/2025
+Eggs;Dairy;1;2.50;2.50;07-08-2025
+Apples;Fruit;6;0.40;2.40;2025-08-07T14:30:00
+Chicken;Meat;1;7.00;7.00;2025-08-07T14:30:00+0200
+Rice;Grains;1;3.00;3.00;2025-08-07 14:30:00
+Tomatoes;Vegetables;4;0.60;2.40;7 August 2025
+Cheese;Dairy;1;4.00;4.00;7 Aug 2025
+Butter;Dairy;1;2.20;2.20;August 7, 2025
+Orange Juice;Beverages;2;2.50;5.00;Aug 7, 2025

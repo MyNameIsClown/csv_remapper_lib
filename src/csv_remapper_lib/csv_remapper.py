@@ -109,7 +109,9 @@ class CSVFile:
                         ":": line.count(":")
                     }
                     for delimiter_key in posible_delimiters.keys():
-                        if posible_delimiters.get(delimiter_key) == len(line.split(delimiter_key)) - 1:
+                        splitted_keys = line.split(delimiter_key)
+                        delimiter_counts = posible_delimiters.get(delimiter_key)
+                        if delimiter_counts != 0 and delimiter_counts == len(splitted_keys) - 1:
                             self.delimiter = delimiter_key
                             break
                 # Adding lists of items to content splitted by calculated delimiter 
@@ -651,6 +653,21 @@ class CSVFile:
         Returns:
             int | float | datetime | str: The value converted to the inferred type, or the original string if no match.
         """
+        valid_datetime_formats = (
+            "%Y-%m-%d",            # 2025-08-07
+            "%d/%m/%Y",            # 07/08/2025
+            "%d-%m-%Y",            # 07-08-2025
+            "%Y-%m-%dT%H:%M:%S",   # 2025-08-07T14:30:00
+            "%Y-%m-%dT%H:%M:%S%z", # 2025-08-07T14:30:00+0200
+            "%Y-%m-%d %H:%M:%S",   # 2025-08-07 14:30:00
+            "%d %B %Y",            # 7 August 2025
+            "%d %b %Y",            # 7 Aug 2025
+            "%B %d, %Y",           # August 7, 2025
+            "%b %d, %Y",           # Aug 7, 2025
+            "%d.%m.%Y",            # 07.08.2025
+            "%A, %d %B %Y",        # Thursday, 07 August 2025
+        )
+
         # 1) Try integer (e.g., "123" or "-123")
         if re.fullmatch(r"-?\d+", s):
             return int(s)
@@ -658,7 +675,7 @@ class CSVFile:
         if re.fullmatch(r"-?\d+\.\d+", s):
             return float(s)
         # 3) Try date (formats: "2025-08-07" or "07/08/2025")
-        for fmt in ("%Y-%m-%d", "%d/%m/%Y"):
+        for fmt in valid_datetime_formats:
             try:
                 return datetime.strptime(s, fmt)
             except ValueError:

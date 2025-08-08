@@ -1,4 +1,5 @@
 import pytest
+from datetime import datetime
 from csv_remapper_lib import CSVFile
 
 def test_load_csv():
@@ -28,9 +29,10 @@ def test_check_types():
         "Category": str,
         "Quantity": int,
         "Unit Price": float,
-        "Total Price": float
+        "Total Price": float,
+        "Date": datetime
     }
-    csv = CSVFile(path="tests/data/sample.csv")
+    csv = CSVFile(path="tests/data/sample_types.csv")
     item_key_type = csv.type_of("Quantity")
     item_key_dict = csv.all_key_types()
     assert item_key_dict == keys_types
